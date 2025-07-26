@@ -1,0 +1,99 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subí tu foto para Reni 🎉</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-pink-100 text-center py-10">
+  <h1 class="text-2xl font-bold mb-6">🎂 ¡Subí tu foto para Reni! 🎂</h1>
+
+  <input type="file" accept="image/*" capture="environment" id="fileInput" class="mb-4" />
+  <br>
+  <button onclick="uploadPhoto()" class="bg-pink-500 text-white px-4 py-2 rounded">Subir Foto</button>
+
+  <p id="status" class="mt-6 text-green-700 font-semibold"></p>
+
+  <hr class="my-10">
+
+  <h2 class="text-xl font-bold mb-4">📸 Galería de fotos</h2>
+  <div id="gallery" class="grid grid-cols-2 gap-4 px-4"></div>
+
+  <script>
+    async function uploadPhoto() {
+      const input = document.getElementById('fileInput');
+      const status = document.getElementById('status');
+      if (!input.files.length) {
+        alert('Por favor, seleccioná una foto.');
+        return;
+      }
+
+      const file = input.files[0];
+
+      // Verificar tipo MIME
+      if (!file.type.startsWith('image/')) {
+        alert('Solo se permiten archivos de imagen.');
+        return;
+      }
+
+      // Verificar tamaño (máximo 10 MB)
+      const maxSizeMB = 10;
+      if (file.size > maxSizeMB * 1024 * 1024) {
+        alert(`La imagen no puede superar los ${maxSizeMB} MB.`);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      status.textContent = 'Subiendo foto...';
+
+      try {
+        const response = await fetch('https://upload-endpoint.vercel.app/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          status.textContent = '✅ ¡Foto subida con éxito! ¡Gracias por compartirla!';
+          input.value = null;
+          loadGallery();
+        } else {
+          status.textContent = '❌ Error al subir la foto.';
+        }
+      } catch (error) {
+        status.textContent = '❌ Ocurrió un error. Intentá nuevamente.';
+      }
+    }
+
+    async function loadGallery() {
+      const gallery = document.getElementById('gallery');
+      gallery.innerHTML = '<p class="col-span-2 text-gray-600">Cargando galería...</p>';
+
+      try {
+        const response = await fetch('https://upload-endpoint.vercel.app/api/gallery');
+        const files = await response.json();
+
+        if (Array.isArray(files)) {
+          gallery.innerHTML = '';
+          files.forEach(url => {
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = "Foto del evento";
+            img.className = "rounded shadow-md w-full";
+            gallery.appendChild(img);
+          });
+        } else {
+          gallery.innerHTML = '<p class="col-span-2 text-red-500">No se pudo cargar la galería.</p>';
+        }
+      } catch (e) {
+        gallery.innerHTML = '<p class="col-span-2 text-red-500">Ocurrió un error al cargar la galería.</p>';
+      }
+    }
+
+    window.onload = loadGallery;
+  </script>
+</body>
+</html>
