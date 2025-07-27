@@ -1,6 +1,5 @@
 // api/upload.js
-import fs from 'fs';
-import path from 'path';
+import { put } from '@vercel/blob';
 
 export const config = {
   api: {
@@ -13,27 +12,26 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const busboy = (await import('busboy')).default;
-  const bb = busboy({ headers: req.headers });
-  const uploadsDir = path.join(process.cwd(), 'public/uploads');
-
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
   }
+  const buffer = Buffer.concat(chunks);
 
-  let savePath = '';
+  const boundary = req.headers['content-type'].split('boundary=')[1];
+  const [header, content] = buffer.toString().split(`--${boundary}`);
 
-  bb.on('file', (fieldname, file, info) => {
-    const { filename } = info;
-    const uniqueName = `${Date.now()}-${filename.replace(/\s+/g, '-')}`;
-    savePath = path.join(uploadsDir, uniqueName);
-    file.pipe(fs.createWriteStream(savePath));
-  });
+  const match = /filename="(.+?)"/.exec(header);
+  const filename = match ? match[1] : `foto-${Date.now()}.jpg`;
 
-  bb.on('close', () => {
-    const relativePath = savePath.split('public')[1].replace(/\\/g, '/');
-    res.status(200).json({ url: relativePath });
-  });
+  try {
+    const blob = await put(filename, buffer, {
+      access: 'public',
+    });
 
-  req.pipe(bb);
+    return res.status(200).json({ url: blob.url });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Error al subir la imagen' });
+  }
 }
